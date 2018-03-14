@@ -1,0 +1,13 @@
+version: "3"
+services:
+  db:
+    image: microsoft/mssql-server-linux:latest
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=EntraLogoAiFilhao@12345
+    ports:
+      - 1433:1433
+    volumes:
+      - mssql:/var/opt/mssql
+volumes:
+  mssql:

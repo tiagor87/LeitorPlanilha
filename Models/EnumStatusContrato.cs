@@ -1,4 +1,4 @@
-namespace googleSheets
+namespace googleSheets.Models
 {
     public enum EnumStatusContrato
     {

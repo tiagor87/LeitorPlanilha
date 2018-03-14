@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Data.SqlClient;
 using System.Globalization;
 
-namespace googleSheets
+namespace googleSheets.Models
 {
     public class Contrato
     {
+        public Contrato() {}
         public Contrato(string resumido, string status, string dataEntrada, string escritorio)
         {
             this.Resumido = resumido;
@@ -24,11 +26,12 @@ namespace googleSheets
             }
             if (!string.IsNullOrWhiteSpace(dataEntrada))
             {
-                DateTime.Parse(dataEntrada, CultureInfo.GetCultureInfo("pt-BR"));
+                this.DataEntrada = DateTime.Parse(dataEntrada, CultureInfo.GetCultureInfo("pt-BR"));
             }
             this.Escritorio = escritorio;
             this.Evolucoes = new List<Evolucao>();
         }
+        public long? Id { get; set; }
         public string Resumido { get; private set; }
         public EnumStatusContrato Status { get; private set; }
         public DateTime? DataEntrada { get; private set; }

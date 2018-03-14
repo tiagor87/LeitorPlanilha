@@ -9,6 +9,9 @@ using Google.Apis.Services;
 using Google.Apis.Sheets.v4;
 using Google.Apis.Sheets.v4.Data;
 using Google.Apis.Util.Store;
+using googleSheets.Infrastructure;
+using googleSheets.Models;
+using Microsoft.EntityFrameworkCore;
 using static Google.Apis.Sheets.v4.SpreadsheetsResource.ValuesResource.GetRequest;
 
 namespace googleSheets
@@ -16,40 +19,46 @@ namespace googleSheets
     class Program
     {
         static string[] Scopes = { SheetsService.Scope.SpreadsheetsReadonly };
-        static string ApplicationName = "Nibo - Leitor de planilha";
+        static string ApplicationName = "NiboPlayground";
 
         static void Main(string[] args)
         {
             var planilha = ObterPlanilha();
             var dadosAgrupadosPorColuna = ExtrairDadosDaPlanilhaAgrupadosPorColuna(planilha);
             var contratos = CriarContratosAPartirDosDadosExtraidos(dadosAgrupadosPorColuna);
+            
+            GravarContratos(contratos);
+        }
 
-            Console.ReadLine();
+        private static IList<Contrato> ObterContratos() {
+            using (var contexto = new EFDbContext())
+            {
+                return contexto.Contratos.Include(c => c.Evolucoes).ToList();
+            }
+        }
 
+        private static void GravarContratos(IList<Contrato> contratos) {
+            using (var contexto = new EFDbContext())
+            {
+                contexto.Contratos.AddRange(contratos);
+                contexto.SaveChanges();
+            }
         }
 
         private static ValueRange ObterPlanilha()
         {
-            UserCredential credential;
-
-            using (var stream =
-                new FileStream("client_secret.json", FileMode.Open, FileAccess.Read))
-            {
-                credential = GoogleWebAuthorizationBroker.AuthorizeAsync(
-                    GoogleClientSecrets.Load(stream).Secrets,
-                    Scopes,
-                    "user",
-                    CancellationToken.None,
-                    new NullDataStore()).Result;
-            }
+            var credential = GoogleCredential.FromFile("credential.json")
+                .CreateScoped(Scopes)
+                .CreateWithUser("niboplayground@niboplayground.iam.gserviceaccount.com");
 
             var service = new SheetsService(new BaseClientService.Initializer()
             {
                 HttpClientInitializer = credential,
                 ApplicationName = ApplicationName,
+                ApiKey = "AIzaSyBxIm7pJoMISavNfbAvYNclX6Mn6Esh0hI"
             });
 
-            String spreadsheetId = "1UMHhZiMOkBrOO8Vw0ash7JFay2_rbOhLATvdwXtijL4";
+            String spreadsheetId = "13PCg_tw4O-nF8ImJkGpjbj7iUOBXmS6YpKYBquhxFHM";
             String range = "Evolução de empresas contratadas CCX";
             SpreadsheetsResource.ValuesResource.GetRequest request = service.Spreadsheets.Values.Get(spreadsheetId, range);
             request.MajorDimension = MajorDimensionEnum.COLUMNS;
@@ -71,7 +80,7 @@ namespace googleSheets
                     var coluna = dadosAgrupadosPorColuna[mesAno];
                     if (coluna.Count > i)
                     {
-                        contrato.Evolucoes.Add(new Evolucao(mesAno, coluna[i]));
+                        contrato.Evolucoes.Add(new Evolucao(contrato, mesAno, coluna[i]));
                     }
                     else
                     {
