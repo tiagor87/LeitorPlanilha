@@ -1,89 +1,64 @@
+DECLARE
+    @cols AS NVARCHAR(MAX),
+    @query  AS NVARCHAR(MAX);
 
-WITH CohortEscritorioCount AS (
-    SELECT
-        FORMAT(C.DataEntrada, 'MM/yyyy', 'pt-BR') as Data,
-        Count(*) AS Count
-    FROM
-        Contratos C
-    WHERE
-        C.DataEntrada IS NOT NULL
-    GROUP BY
-        FORMAT(C.DataEntrada, 'MM/yyyy', 'pt-BR')
-)
-
-WITH A AS
-(SELECT
-    FORMAT(C.DataEntrada, 'yyyy/MM') AS Cohort,
-    FORMAT(E.DataReferencia, 'yyyy/MM') AS Month,
-    ABS(DATEDIFF(MONTH, C.DataEntrada, E.DataReferencia)) AS Progress,
-    E.Quantidade AS Count
+SELECT
+    FORMAT(C.DataEntrada, 'yyyy/MM', 'pt-BR') as Cohort,
+    FORMAT(E.DataReferencia, 'yyyy/MM', 'pt-BR') as Month,
+    DATEDIFF(MONTH, C.DataEntrada, E.DataReferencia) AS Progress,
+    COUNT(*) AS Count,
+    SUM(ISNULL(E.Quantidade, 0)) AS Value
+INTO
+    #CohortData
 FROM
-    Contratos C
-        JOIN Evolucoes E ON E.ContratoId = C.Id
+    Contratos C INNER JOIN Evolucoes E ON (C.Id = E.ContratoId AND FORMAT(E.DataReferencia, 'yyyy/MM', 'pt-BR') >= FORMAT(C.DataEntrada, 'yyyy/MM', 'pt-BR'))
 WHERE
-    C.DataEntrada IS NOT NULL)
-
-select
-    Cohort,
-    Month,
-    Progress,
-    Sum(Count) as Count
-from A
+    C.[Status] = 1
 GROUP BY
-    Cohort,
-    Month,
-    Progress
+    FORMAT(C.DataEntrada, 'yyyy/MM', 'pt-BR'),
+    FORMAT(E.DataReferencia, 'yyyy/MM', 'pt-BR'),
+    DATEDIFF(MONTH, C.DataEntrada, E.DataReferencia)
 
-
+SELECT @cols = STUFF (
+    (
+        SELECT
+            ',' + QUOTENAME(C.Progress) 
+        FROM
+            #CohortData C
+        GROUP BY
+            C.Progress
+        ORDER BY
+            C.Progress
+        FOR XML PATH(''), TYPE
+    ).value('.', 'NVARCHAR(MAX)'),
+    1,
+    1,
+    ''
+)
 SELECT
-    ROUND(DATEDIFF(MONTH, C.DataEntrada, E.DataReferencia)/30.4, 1) AS months,
-    FORMAT(E.DataReferencia, 'yyyy/MM') AS MONTH,
-    FORMAT(C.DataEntrada, 'yyyy/MM') AS cohort,
-    COUNT(DISTINCT C.Id) AS actives
-FROM Contratos C
-    JOIN Evolucoes E ON E.ContratoId = C.Id
-GROUP BY
-    FORMAT(C.DataEntrada, 'yyyy/MM'),
-    FORMAT(E.DataReferencia, 'yyyy/MM'),
-    ROUND(DATEDIFF(MONTH, C.DataEntrada, E.DataReferencia)/30.4, 0)
+    @query = 
+        N'
+        SELECT
+            *
+        FROM
+            (
+                SELECT
+                    D.Cohort,
+                    D.Count,
+                    D.Progress,
+                    D.Value
+                FROM
+                    #CohortData D
+            ) C
+            PIVOT (
+                SUM([Value]) FOR Progress IN (
+                    ' + @cols + '
+                )
+            ) PC
+        ORDER BY
+            Cohort
+        '
 
-SELECT
-    results.months,
-    results.cohort,
-    results.actives AS active_users,
-    user_totals.total AS total_users,
-    results.actives/user_totals.total*100 AS percent_active
-FROM
-  (
-    SELECT
-        ROUND(DATEDIFF(MONTH, C.DataEntrada, E.DataReferencia)/30.4, 0) AS months,
-        FORMAT(E.DataReferencia, '%Y/%m') AS MONTH,
-        FORMAT(C.DataEntrada, '%Y/%m') AS cohort,
-        COUNT(DISTINCT C.Id) AS actives
-    FROM Contratos C
-        JOIN Evolucoes E ON E.ContratoId = C.Id
-    GROUP BY
-        FORMAT(C.DataEntrada, '%Y/%m'),
-        FORMAT(E.DataReferencia, '%Y/%m'),
-        ROUND(DATEDIFF(MONTH, C.DataEntrada, E.DataReferencia)/30.4, 0) ) AS results
-JOIN
-  ( SELECT DATE_FORMAT(date, "%Y/%m") AS cohort,
-           count(id) AS total
-   FROM users
-   GROUP BY cohort ) AS user_totals ON user_totals.cohort = results.cohort
-WHERE results.MONTH < DATE_FORMAT(NOW(), '%Y/%m');
+EXECUTE(@query)
 
-
-SELECT
-    C.Escritorio,
-    E.Ano,
-    E.Mes,
-    SUM(E.Quantidade)
-FROM
-    Contratos C
-        INNER JOIN Evolucoes E ON C.Id = E.ContratoId
-GROUP BY
-    C.Escritorio,
-    E.Ano,
-    E.Mes
-    
+DROP TABLE #CohortData
