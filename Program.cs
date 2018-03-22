@@ -26,18 +26,20 @@ namespace googleSheets
             var planilha = ObterPlanilha();
             var dadosAgrupadosPorColuna = ExtrairDadosDaPlanilhaAgrupadosPorColuna(planilha);
             var contratos = CriarContratosAPartirDosDadosExtraidos(dadosAgrupadosPorColuna);
-            
+
             GravarContratos(contratos);
         }
 
-        private static IList<Contrato> ObterContratos() {
+        private static IList<Contrato> ObterContratos()
+        {
             using (var contexto = new EFDbContext())
             {
                 return contexto.Contratos.Include(c => c.Evolucoes).ToList();
             }
         }
 
-        private static void GravarContratos(IList<Contrato> contratos) {
+        private static void GravarContratos(IList<Contrato> contratos)
+        {
             using (var contexto = new EFDbContext())
             {
                 contexto.Contratos.AddRange(contratos);
@@ -58,7 +60,7 @@ namespace googleSheets
                 ApiKey = "AIzaSyBxIm7pJoMISavNfbAvYNclX6Mn6Esh0hI"
             });
 
-            String spreadsheetId = "13PCg_tw4O-nF8ImJkGpjbj7iUOBXmS6YpKYBquhxFHM";
+            String spreadsheetId = "1UMHhZiMOkBrOO8Vw0ash7JFay2_rbOhLATvdwXtijL4";
             String range = "Evolução de empresas contratadas CCX";
             SpreadsheetsResource.ValuesResource.GetRequest request = service.Spreadsheets.Values.Get(spreadsheetId, range);
             request.MajorDimension = MajorDimensionEnum.COLUMNS;
